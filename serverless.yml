@@ -1,0 +1,94 @@
+service: crossposting-bot
+# frameworkVersion: "=X.X.X"
+
+plugins:
+  - serverless-prune-plugin
+
+custom:
+  prune:
+    automatic: true
+    number: 3
+  default_stage: staging
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  stage: ${opt:stage, self:custom.default_stage}
+  region: ${file(./env.yml):${self:provider.stage}.REGION}
+  profile: ${file(./env.yml):${self:provider.stage}.AWS_PROFILE}
+  logRetentionInDays: 30
+  memorySize: 1536
+  timeout: 300
+  environment: ${file(./env.yml):${self:provider.stage}}
+
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:PutItem
+        - dynamodb:GetItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+        - dynamodb:DescribeTable
+        - dynamodb:Query
+        - dynamodb:Scan
+      Resource:
+        - { 'Fn::GetAtt': ['UserTable', 'Arn'] }
+        - { 'Fn::GetAtt': ['ChannelTable', 'Arn'] }
+
+package:
+  exclude:
+    - '**/__tests__/**'
+    - coverage/**
+
+functions:
+  event:
+    description: Slack Event Subscriptions
+    handler: handler.event
+    events:
+      - http:
+          path: event
+          method: post
+
+resources:
+  Resources:
+    UserTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.TABLE_NAME_USER}
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+          - AttributeName: appid
+            KeyType: RANGE
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: appid
+            AttributeType: S
+        BillingMode: PAY_PER_REQUEST
+    ChannelTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.TABLE_NAME_CHANNEL}
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+          - AttributeName: appid
+            KeyType: RANGE
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: appid
+            AttributeType: S
+          - AttributeName: name
+            AttributeType: S
+        BillingMode: PAY_PER_REQUEST
+        GlobalSecondaryIndexes:
+          - IndexName: byName
+            KeySchema:
+              - AttributeName: name
+                KeyType: HASH
+              - AttributeName: appid
+                KeyType: RANGE
+            Projection:
+              ProjectionType: KEYS_ONLY

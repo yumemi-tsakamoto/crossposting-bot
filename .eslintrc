@@ -1,0 +1,11 @@
+{
+  "extends": ["universe/node"],
+  "globals": {
+    "process": false,
+    "console": false
+  },
+  "env": {
+    "jest": true,
+    "es6": true
+  }
+}
